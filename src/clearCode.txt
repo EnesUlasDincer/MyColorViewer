@@ -1,0 +1,99 @@
+
+// #include "window.hpp"
+// #include "libobsensor/hpp/Pipeline.hpp"
+// #include "libobsensor/hpp/Error.hpp"
+// #include <opencv2/opencv.hpp>
+// #include <opencv2/objdetect.hpp>
+// #include <iostream>
+
+
+// int main(int argc, char **argv) try {
+//     // Create a pipeline with default device
+//     ob::Pipeline pipe;
+
+//     // Configure which streams to enable or disable for the Pipeline by creating a Config
+//     std::shared_ptr<ob::Config> config = std::make_shared<ob::Config>();
+//     config->enableVideoStream(OB_STREAM_COLOR);
+
+//     // Start the pipeline with config
+//     pipe.start(config);
+//     auto currentProfile = pipe.getEnabledStreamProfileList()->getProfile(0)->as<ob::VideoStreamProfile>();
+
+//     // Create a window for rendering, and set the resolution of the window
+//     Window app("QR Code Viewer with Metadata", currentProfile->width(), currentProfile->height());
+
+//     // Initialize OpenCV QR code detector
+//     cv::QRCodeDetector qrDetector;
+
+//     while(app) {
+//         // Wait for up to 100ms for a frameset in blocking mode
+//         auto frameSet = pipe.waitForFrames(100);
+//         if (frameSet == nullptr) {
+//             continue; // No frameset available, try again
+//         }
+        
+//         // Get color frame from frameset
+//         auto colorFrame = frameSet->colorFrame();
+//         if (colorFrame == nullptr || !colorFrame->data()) {
+//             continue; // Invalid or empty colorFrame, skip this iteration
+//         }
+
+//         // Check dimensions
+//         int height = colorFrame->height();
+//         int width = colorFrame->width();
+//         if (height <= 0 || width <= 0) {
+//             std::cerr << "Invalid dimensions: Height=" << height << ", Width=" << width << std::endl;
+//             continue;
+//         }
+
+//         // Convert color frame to OpenCV Mat
+//         cv::Mat frame(height, width, CV_8U, colorFrame->data());
+
+
+//         if (frame.empty()) {
+//             std::cerr << "Failed to create cv::Mat from colorFrame!" << std::endl;
+//             continue;
+//         }
+
+//         // Detect and decode QR codes
+//         cv::Mat points;
+//         std::string qrData = qrDetector.detectAndDecode(frame, points);
+	
+// 	    // Print detected QR data
+//         if (!qrData.empty()) {
+//              std::cout << "Detected QR code: " << qrData << std::endl;
+//         }
+
+//         // if(!qrData.empty()) {
+//         //     std::cout << "Detected QR Code: " << qrData << std::endl;
+
+//         //     // Draw bounding box around QR code
+//         //     if(points.size() == 4) {
+//         //         for(size_t i = 0; i < points.size(); i++) {
+//         //             cv::line(frame, points[i], points[(i + 1) % 4], cv::Scalar(0, 255, 0), 2);
+//         //         }
+
+//         //         // Calculate orientation angle
+//         //         double angle = atan2(points[1].y - points[0].y, points[1].x - points[0].x) * 180.0 / CV_PI;
+//         //         std::cout << "QR Code Orientation: " << angle << " degrees" << std::endl;
+
+//         //         // Mark corners for reference
+//         //         cv::circle(frame, points[0], 5, cv::Scalar(0, 0, 255), -1); // Top-left
+//         //         cv::circle(frame, points[1], 5, cv::Scalar(255, 0, 0), -1); // Top-right
+//         //     }
+//         // }
+
+
+//         // Render the modified frame in the window
+//         app.addToRender(colorFrame);
+//     }
+
+//     // Stop the Pipeline, no frame data will be generated
+//     pipe.stop();
+
+//     return 0;
+// }
+// catch(ob::Error &e) {
+//     std::cerr << "function:" << e.getName() << "\nargs:" << e.getArgs() << "\nmessage:" << e.getMessage() << "\ntype:" << e.getExceptionType() << std::endl;
+//     exit(EXIT_FAILURE);
+// }
