@@ -102,40 +102,6 @@
 #include <opencv2/objdetect.hpp>
 #include <iostream>
 
-const char *metaDataTypes[] = { "TIMESTAMP",
-                                "SENSOR_TIMESTAMP",
-                                "FRAME_NUMBER",
-                                "AUTO_EXPOSURE",
-                                "EXPOSURE",
-                                "GAIN",
-                                "AUTO_WHITE_BALANCE",
-                                "WHITE_BALANCE",
-                                "BRIGHTNESS",
-                                "CONTRAST",
-                                "SATURATION",
-                                "SHARPNESS",
-                                "BACKLIGHT_COMPENSATION",
-                                "HUE",
-                                "GAMMA",
-                                "POWER_LINE_FREQUENCY",
-                                "LOW_LIGHT_COMPENSATION",
-                                "MANUAL_WHITE_BALANCE",
-                                "ACTUAL_FRAME_RATE",
-                                "FRAME_RATE",
-                                "AE_ROI_LEFT",
-                                "AE_ROI_TOP",
-                                "AE_ROI_RIGHT",
-                                "AE_ROI_BOTTOM",
-                                "EXPOSURE_PRIORITY",
-                                "HDR_SEQUENCE_NAME",
-                                "HDR_SEQUENCE_SIZE",
-                                "HDR_SEQUENCE_INDEX",
-                                "LASER_POWER",
-                                "LASER_POWER_LEVEL",
-                                "LASER_STATUS",
-                                "GPIO_INPUT_DATA" };
-
-
 int main(int argc, char **argv) try {
     // Create a pipeline with default device
     ob::Pipeline pipe;
@@ -182,9 +148,6 @@ int main(int argc, char **argv) try {
 
         // colorFrame format
         //std::cout << "Color Frame Format: " << colorFrame->format() << std::endl;
-
-        //cv::Mat frame(height, width, CV_8U, colorFrame->data());
-        // cv::Mat frame(height, width, CV_8UC3, colorFrame->data());
         
         // Get the MJPEG data from the color frame
         std::vector<uint8_t> mjpegData((uint8_t*)colorFrame->data(), 
@@ -200,29 +163,6 @@ int main(int argc, char **argv) try {
         // Convert to grayscale for QR detection
         cv::Mat gray;
         cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
-        
-        // // Get frame data and properties
-        // void* rawData = colorFrame->data();
-        // uint32_t width2 = colorFrame->width();
-        // uint32_t height2 = colorFrame->height();
-        // uint8_t* pixelData = static_cast<uint8_t*>(rawData); // Assume CV_8UC3 (BGR image)
-
-        // if (!pixelData) {
-        //     std::cerr << "Frame data is null." << std::endl;
-        //     continue;
-        // }
-
-        // // Display pixel data
-        // for (uint32_t y = 0; y < height2; ++y) {
-        //     for (uint32_t x = 0; x < width2; ++x) {
-        //         uint8_t b = pixelData[(y * width2 + x) * 3 + 0]; // Blue channel
-        //         uint8_t g = pixelData[(y * width2 + x) * 3 + 1]; // Green channel
-        //         uint8_t r = pixelData[(y * width2 + x) * 3 + 2]; // Red channel
-
-        //         std::cout << "Pixel (" << x << ", " << y << "): "
-        //                 << "B=" << (int)b << ", G=" << (int)g << ", R=" << (int)r << std::endl;
-        //     }
-        // }
 
         if (frame.empty()) {
             std::cerr << "Failed to create cv::Mat from colorFrame!" << std::endl;
@@ -231,37 +171,12 @@ int main(int argc, char **argv) try {
 
         // Detect and decode QR codes
         cv::Mat points;
-        //std::string qrData = qrDetector.detectAndDecode(frame, points);
         std::string qrData = qrDetector.detectAndDecode(gray, points);
-        //std::string qrData = qrDetector.detectAndDecode(frame, points);
-        //std::string qrData = qrDetector.detectAndDecode(bgrFrame);
 	
 	    // Print detected QR data
         if (!qrData.empty()) {
              std::cout << "Detected QR code: " << qrData << std::endl;
         }
-
-        // if(!qrData.empty()) {
-        //     std::cout << "Detected QR Code: " << qrData << std::endl;
-
-        //     // Draw bounding box around QR code
-        //     if(points.size() == 4) {
-        //         for(size_t i = 0; i < points.size(); i++) {
-        //             cv::line(frame, points[i], points[(i + 1) % 4], cv::Scalar(0, 255, 0), 2);
-        //         }
-
-        //         // Calculate orientation angle
-        //         double angle = atan2(points[1].y - points[0].y, points[1].x - points[0].x) * 180.0 / CV_PI;
-        //         std::cout << "QR Code Orientation: " << angle << " degrees" << std::endl;
-
-        //         // Mark corners for reference
-        //         cv::circle(frame, points[0], 5, cv::Scalar(0, 0, 255), -1); // Top-left
-        //         cv::circle(frame, points[1], 5, cv::Scalar(255, 0, 0), -1); // Top-right
-        //     }
-        // }
-
-        // get color frame from frameset
-        // auto colorFrame = frameSet->colorFrame();
 
         // Render the modified frame in the window
         app.addToRender(colorFrame);
