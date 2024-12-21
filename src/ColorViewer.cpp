@@ -4,6 +4,52 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/objdetect.hpp>
 #include <iostream>
+#include <opencv2/aruco.hpp>
+
+
+void estimatePose(cv::Mat &frame, const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, 
+                  const std::vector<cv::Point2f> &imagePoints, float qrWidth, float qrHeight) {
+    // Define the 3D points of the QR code in the QR code's coordinate system
+    std::vector<cv::Point3f> objectPoints = {
+        {0, 0, 0},                    // Top-left
+        {qrWidth, 0, 0},              // Top-right
+        {qrWidth, qrHeight, 0},       // Bottom-right
+        {0, qrHeight, 0}              // Bottom-left
+    };
+
+    // Output rotation and translation vectors
+    cv::Mat rvec, tvec;
+
+    // Solve the PnP problem to find the pose
+    bool success = cv::solvePnP(objectPoints, imagePoints, cameraMatrix, distCoeffs, rvec, tvec);
+
+    if (success) {
+        std::cout << "Pose estimation successful!" << std::endl;
+
+        // Draw the coordinate axes on the frame
+        std::vector<cv::Point3f> axisPoints = {
+            {qrWidth, 0, 0},           // X-axis endpoint
+            {0, qrHeight, 0},          // Y-axis endpoint
+            {0, 0, -qrWidth}           // Z-axis endpoint
+        };
+
+        std::vector<cv::Point2f> imageAxisPoints;
+        cv::projectPoints(axisPoints, rvec, tvec, cameraMatrix, distCoeffs, imageAxisPoints);
+
+        // Draw the axes on the frame
+        cv::line(frame, imagePoints[0], imageAxisPoints[0], cv::Scalar(0, 0, 255), 2); // X-axis in red
+        cv::line(frame, imagePoints[0], imageAxisPoints[1], cv::Scalar(0, 255, 0), 2); // Y-axis in green
+        cv::line(frame, imagePoints[0], imageAxisPoints[2], cv::Scalar(255, 0, 0), 2); // Z-axis in blue
+
+        // Display rotation and translation vectors
+        std::cout << "Rotation Vector: " << rvec.t() << std::endl;
+        std::cout << "Translation Vector: " << tvec.t() << std::endl;
+    } else {
+        std::cerr << "Pose estimation failed!" << std::endl;
+    }
+}
+
+
 
 int main(int argc, char **argv) try {
     // Create a pipeline with default device
@@ -20,6 +66,30 @@ int main(int argc, char **argv) try {
     // Create a window for rendering, and set the resolution of the window
     //Window app("QR Code Viewer with Metadata", currentProfile->width(), currentProfile->height());
     
+    // Camera parameters (replace with actual calibration data)
+    // Define the camera matrix and distortion coefficients
+    cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << 
+        1123.55, 0, 951.093,
+        0, 1122.8, 537.485,
+        0, 0, 1);
+
+    cv::Mat distCoeffs = (cv::Mat_<double>(1, 8) << 
+        0.0737156, -0.10446, 0.043283, 0, 0, 0, -0.000494045, -0.000249066);
+
+    ////
+    // depthIntrinsic fx:1123.55, fy1122.8, cx:951.093, cy:537.485 ,width:1920, height:1080
+    // rgbIntrinsic fx:1123.55, fy1122.8, cx:951.093, cy:537.485, width:1920, height:1080
+    // depthDistortion k1:0.0737156, k2:-0.10446, k3:0.043283, k4:0, k5:0, k6:0, p1:-0.000494045, p2:-0.000249066
+    // rgbDistortion k1:0.0737156, k2:-0.10446, k3:0.043283, k4:0, k5:0, k6:0, p1:-0.000494045, p2:-0.000249066
+    // transform-rot: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+    // transform-trans: [ 0,  0,  0]
+    ////
+
+
+    float qrWidth = 0.1f;  // 10 cm
+    float qrHeight = 0.1f; // 10 cm
+
+
     // Initialize OpenCV QR code detector
     cv::QRCodeDetector qrDetector;
     int counterQR = 0;
@@ -83,10 +153,10 @@ int main(int argc, char **argv) try {
 
             if (!points.empty() && points.rows == 1 && points.cols == 4) {
                 // Extract the 4 corner points from `points`
-                cv::Point p1(points.at<float>(0, 0), points.at<float>(0, 1)); // Top-left
-                cv::Point p2(points.at<float>(0, 2), points.at<float>(0, 3)); // Top-right
-                cv::Point p3(points.at<float>(0, 4), points.at<float>(0, 5)); // Bottom-right
-                cv::Point p4(points.at<float>(0, 6), points.at<float>(0, 7)); // Bottom-left
+                cv::Point2f p1(points.at<float>(0, 0), points.at<float>(0, 1)); // Top-left
+                cv::Point2f p2(points.at<float>(0, 2), points.at<float>(0, 3)); // Top-right
+                cv::Point2f p3(points.at<float>(0, 4), points.at<float>(0, 5)); // Bottom-right
+                cv::Point2f p4(points.at<float>(0, 6), points.at<float>(0, 7)); // Bottom-left
 
                 // Draw the rectangle by connecting the points
                 cv::line(frame, p1, p2, cv::Scalar(0, 255, 0), 2);
@@ -95,9 +165,18 @@ int main(int argc, char **argv) try {
                 cv::line(frame, p4, p1, cv::Scalar(0, 255, 0), 2);
 
                 std::cout << "QR code bounding box drawn!" << std::endl;
+
+                // Populate imagePoints with the extracted points
+                std::vector<cv::Point2f> imagePoints = {p1, p2, p3, p4};
+
+                // Now you can pass imagePoints to the pose estimation function
+                estimatePose(frame, cameraMatrix, distCoeffs, imagePoints, qrWidth, qrHeight);
+
             } else {
                 std::cerr << "Invalid points matrix for bounding box!" << std::endl;
             }
+
+            
 
             
         }
