@@ -18,12 +18,12 @@ int main(int argc, char **argv) try {
     auto currentProfile = pipe.getEnabledStreamProfileList()->getProfile(0)->as<ob::VideoStreamProfile>();
 
     // Create a window for rendering, and set the resolution of the window
-    Window app("QR Code Viewer with Metadata", currentProfile->width(), currentProfile->height());
-
+    //Window app("QR Code Viewer with Metadata", currentProfile->width(), currentProfile->height());
+    
     // Initialize OpenCV QR code detector
     cv::QRCodeDetector qrDetector;
-
-    while(app) {
+    int counterQR = 0;
+    while(true) {
         // Wait for up to 100ms for a frameset in blocking mode
         auto frameSet = pipe.waitForFrames(100);
         if (frameSet == nullptr) {
@@ -78,11 +78,39 @@ int main(int argc, char **argv) try {
 	
 	    // Print detected QR data
         if (!qrData.empty()) {
-             std::cout << "Detected QR code: " << qrData << std::endl;
+            counterQR++;
+            std::cout << "Detected QR code: " << qrData << " counter: " << counterQR << std::endl;
+
+            if (!points.empty() && points.rows == 1 && points.cols == 4) {
+                // Extract the 4 corner points from `points`
+                cv::Point p1(points.at<float>(0, 0), points.at<float>(0, 1)); // Top-left
+                cv::Point p2(points.at<float>(0, 2), points.at<float>(0, 3)); // Top-right
+                cv::Point p3(points.at<float>(0, 4), points.at<float>(0, 5)); // Bottom-right
+                cv::Point p4(points.at<float>(0, 6), points.at<float>(0, 7)); // Bottom-left
+
+                // Draw the rectangle by connecting the points
+                cv::line(frame, p1, p2, cv::Scalar(0, 255, 0), 2);
+                cv::line(frame, p2, p3, cv::Scalar(0, 255, 0), 2);
+                cv::line(frame, p3, p4, cv::Scalar(0, 255, 0), 2);
+                cv::line(frame, p4, p1, cv::Scalar(0, 255, 0), 2);
+
+                std::cout << "QR code bounding box drawn!" << std::endl;
+            } else {
+                std::cerr << "Invalid points matrix for bounding box!" << std::endl;
+            }
+
+            
         }
+        
 
         // Render the modified frame in the window
-        app.addToRender(colorFrame);
+        //app.addToRender(colorFrame);        
+        //app.waitKey(10);
+
+        // Render the modified frame in the window (use OpenCV frame directly)
+        cv::imshow("QR Code Viewer with Metadata", frame);
+        if (cv::waitKey(10) >= 27) break;
+
     }
 
     // Stop the Pipeline, no frame data will be generated
