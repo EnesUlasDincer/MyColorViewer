@@ -4,7 +4,39 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/objdetect.hpp>
 #include <iostream>
+#include <fstream>
 #include <opencv2/aruco.hpp>
+
+// Global queue to store the last 50 transformation matrices
+std::deque<cv::Mat> transformationQueue;
+int POSE_counter = 50;
+
+void addTransformationMatrix(const cv::Mat& transformationMatrix) {
+    // Add the transformation matrix to the queue
+    transformationQueue.push_back(transformationMatrix);
+
+    // Keep only the last 50 matrices
+    if (transformationQueue.size() > POSE_counter) {
+        transformationQueue.pop_front();
+    }
+}
+
+// Function to calculate the mean transformation matrix
+cv::Mat calculateMeanTransformation() {
+    if (transformationQueue.empty()) {
+        std::cerr << "No transformation matrices available!" << std::endl;
+        return cv::Mat();
+    }
+
+    cv::Mat meanMatrix = cv::Mat::zeros(4, 4, CV_64F);
+
+    for (const auto& matrix : transformationQueue) {
+        meanMatrix += matrix;
+    }
+
+    meanMatrix /= static_cast<double>(transformationQueue.size());
+    return meanMatrix;
+}
 
 
 void estimatePose(cv::Mat &frame, const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, 
@@ -44,11 +76,51 @@ void estimatePose(cv::Mat &frame, const cv::Mat &cameraMatrix, const cv::Mat &di
         // Display rotation and translation vectors
         std::cout << "Rotation Vector: " << rvec.t() << std::endl;
         std::cout << "Translation Vector: " << tvec.t() << std::endl;
+
+        // Convert the rotation vector to a rotation matrix
+        cv::Mat rotationMatrix;
+        cv::Rodrigues(rvec, rotationMatrix);
+
+        // Create the transformation matrix
+        cv::Mat transformationMatrix = cv::Mat::eye(4, 4, CV_64F);
+        rotationMatrix.copyTo(transformationMatrix(cv::Rect(0, 0, 3, 3)));
+        tvec.copyTo(transformationMatrix(cv::Rect(3, 0, 1, 3)));
+
+        // Store the transformation matrix
+        addTransformationMatrix(transformationMatrix);
+
+        // Calculate the mean transformation matrix
+        cv::Mat meanMatrix = calculateMeanTransformation();
+
+        std::cout << "Mean Transformation Matrix:" << std::endl
+                  << meanMatrix << std::endl;
+
+        // if transformationQueue is full, save the mean transformation matrix to a file
+        if (transformationQueue.size() == POSE_counter) {
+            std::string filename = "pose_estimation.txt";
+            std::ofstream outFile(filename);
+
+            if (outFile.is_open()) {
+                outFile << "Mean Transformation Matrix:\n";
+                for (int i = 0; i < meanMatrix.rows; ++i) {
+                    for (int j = 0; j < meanMatrix.cols; ++j) {
+                        outFile << meanMatrix.at<double>(i, j);
+                        if (j < meanMatrix.cols - 1) {
+                            outFile << " ";
+                        }
+                    }
+                    outFile << "\n";
+                }
+                    outFile.close();
+                    std::cout << "Mean transformation matrix saved to " << filename << std::endl;
+                } else {
+                    std::cerr << "Failed to open file for writing: " << filename << std::endl;
+                }
+        }
     } else {
         std::cerr << "Pose estimation failed!" << std::endl;
     }
 }
-
 
 
 int main(int argc, char **argv) try {
