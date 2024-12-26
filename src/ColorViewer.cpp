@@ -40,7 +40,7 @@ cv::Mat calculateMeanTransformation() {
 
 
 void estimatePose(cv::Mat &frame, const cv::Mat &cameraMatrix, const cv::Mat &distCoeffs, 
-                  const std::vector<cv::Point2f> &imagePoints, float qrWidth, float qrHeight) {
+                  const std::vector<cv::Point2f> &imagePoints, float qrWidth, float qrHeight, int cameraChoice) {
     // Define the 3D points of the QR code in the QR code's coordinate system
     std::vector<cv::Point3f> objectPoints = {
         {0, 0, 0},                    // Top-left
@@ -97,7 +97,8 @@ void estimatePose(cv::Mat &frame, const cv::Mat &cameraMatrix, const cv::Mat &di
 
         // if transformationQueue is full, save the mean transformation matrix to a file
         if (transformationQueue.size() == POSE_counter) {
-            std::string filename = "pose_estimation.txt";
+            std::string filename = "Cam_" + std::to_string(cameraChoice) + "_" + "pose_estimation" + ".txt";
+
             std::ofstream outFile(filename);
 
             if (outFile.is_open()) {
@@ -124,8 +125,37 @@ void estimatePose(cv::Mat &frame, const cv::Mat &cameraMatrix, const cv::Mat &di
 
 
 int main(int argc, char **argv) try {
+
+    ob::Context context;
+
+    // Query the list of connected devices
+    auto devList = context.queryDeviceList();
+
+    // ask user to choose the camera
+    std::cout << "Choose the camera (1 or 2): ";
+    int cameraChoice;
+    std::cin >> cameraChoice;
+
+    //auto dev = devList->getDevice(cameraChoice);
+    std::shared_ptr<ob::Device> dev;
+
+    // check the camera serial number if it is CL8A8420179 or CL8A84201GW 
+    // select the correct device
+    // Get the number of connected devices
+    int devCount = devList->deviceCount();
+    for (int i = 0; i < devCount; i++) {
+        // if devList->serialNumber(i) == "CL8A8420179" or "CL8A84201GW"
+        // select the device
+        if (strcmp(devList->serialNumber(i), "CL8A8420179") == 0 && cameraChoice == 1) {
+            dev = devList->getDevice(i);
+        } else if (strcmp(devList->serialNumber(i), "CL8A84201GW") == 0 && cameraChoice == 2) {
+            dev = devList->getDevice(i);
+        }
+    }
+
+
     // Create a pipeline with default device
-    ob::Pipeline pipe;
+    ob::Pipeline pipe(dev);
 
     // Configure which streams to enable or disable for the Pipeline by creating a Config
     std::shared_ptr<ob::Config> config = std::make_shared<ob::Config>();
@@ -137,18 +167,26 @@ int main(int argc, char **argv) try {
 
     // Create a window for rendering, and set the resolution of the window
     //Window app("QR Code Viewer with Metadata", currentProfile->width(), currentProfile->height());
+
+    // chose the camera matrix and distortion coefficients
+    // ask input from user
+    cv::Mat cameraMatrix;
+    cv::Mat distCoeffs;
+
     
     // Camera parameters (replace with actual calibration data)
     // Define the camera matrix and distortion coefficients
-    cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << 
+    cv::Mat camera_1_Matrix = (cv::Mat_<double>(3, 3) << 
         1123.55, 0, 951.093,
         0, 1122.8, 537.485,
         0, 0, 1);
 
-    cv::Mat distCoeffs = (cv::Mat_<double>(1, 8) << 
+    cv::Mat dist_1_Coeffs = (cv::Mat_<double>(1, 8) << 
         0.0737156, -0.10446, 0.043283, 0, 0, 0, -0.000494045, -0.000249066);
 
-    ////
+    //// CAM 1
+    // Camera calibration data 
+    // Serial Number: CL8A8420179
     // depthIntrinsic fx:1123.55, fy1122.8, cx:951.093, cy:537.485 ,width:1920, height:1080
     // rgbIntrinsic fx:1123.55, fy1122.8, cx:951.093, cy:537.485, width:1920, height:1080
     // depthDistortion k1:0.0737156, k2:-0.10446, k3:0.043283, k4:0, k5:0, k6:0, p1:-0.000494045, p2:-0.000249066
@@ -156,6 +194,36 @@ int main(int argc, char **argv) try {
     // transform-rot: [1, 0, 0, 0, 1, 0, 0, 0, 1]
     // transform-trans: [ 0,  0,  0]
     ////
+
+    cv::Mat camera_2_Matrix = (cv::Mat_<double>(3, 3) << 
+        1118.76, 0, 965.197,
+        0, 1118.42, 544.13,
+        0, 0, 1);
+
+    cv::Mat dist_2_Coeffs = (cv::Mat_<double>(1, 8) << 
+        0.0764899, -0.105664, 0.0430727, 0, 0, 0, -0.000198552, -0.000445639);
+
+    //// CAM 2
+    // Camera calibration data
+    // Serial Number: CL8A84201GW
+    // depthIntrinsic fx:1118.76, fy1118.42, cx:965.197, cy:544.13 ,width:1920, height:1080
+    // rgbIntrinsic fx:1118.76, fy1118.42, cx:965.197, cy:544.13, width:1920, height:1080
+    // depthDistortion k1:0.0764899, k2:-0.105664, k3:0.0430727, k4:0, k5:0, k6:0, p1:-0.000198552, p2:0.000445639
+    // rgbDistortion k1:0.0764899, k2:-0.105664, k3:0.0430727, k4:0, k5:0, k6:0, p1:-0.000198552, p2:0.000445639
+    // transform-rot: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+    // transform-trans: [ 0,  0,  0]
+    ////
+
+    if (cameraChoice == 1) {
+        cameraMatrix = camera_1_Matrix;
+        distCoeffs = dist_1_Coeffs;
+    } else if (cameraChoice == 2) {
+        cameraMatrix = camera_2_Matrix;
+        distCoeffs = dist_2_Coeffs;
+    } else {
+        std::cerr << "Invalid camera choice!" << std::endl;
+        return 1;
+    }
 
 
     float qrWidth = 0.1f;  // 10 cm
@@ -242,7 +310,7 @@ int main(int argc, char **argv) try {
                 std::vector<cv::Point2f> imagePoints = {p1, p2, p3, p4};
 
                 // Now you can pass imagePoints to the pose estimation function
-                estimatePose(frame, cameraMatrix, distCoeffs, imagePoints, qrWidth, qrHeight);
+                estimatePose(frame, cameraMatrix, distCoeffs, imagePoints, qrWidth, qrHeight, cameraChoice);
 
             } else {
                 std::cerr << "Invalid points matrix for bounding box!" << std::endl;
